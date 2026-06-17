@@ -23,9 +23,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Apple Silicon only — Myndr does not support Intel Macs.
         include:
-          - { runner: macos-14, arch: arm64 }   # Apple Silicon (native)
-          - { runner: macos-13, arch: x86_64 }  # Intel (native)
+          - { runner: macos-14, arch: arm64 }   # native arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4

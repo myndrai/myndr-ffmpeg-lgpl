@@ -1,8 +1,9 @@
 # myndr-ffmpeg-lgpl
 
-Static, **LGPL-only** `ffmpeg` builds for macOS (arm64 + x86_64), published as
-immutable GitHub release assets. Myndr's `scripts/fetch-binaries.sh` pins a
-release tag and downloads the per-arch binary at build time.
+Static, **LGPL-only** `ffmpeg` builds for macOS **Apple Silicon (arm64)**,
+published as immutable GitHub release assets. Myndr's `scripts/fetch-binaries.sh`
+pins a release tag and downloads the binary at build time. Intel Macs are not
+supported (Myndr is Apple Silicon only), so no x86_64 slice is built.
 
 This repo exists because there is **no upstream prebuilt LGPL ffmpeg for macOS
 arm64**: evermeet ships GPL+nonfree (and is non-redistributable due to `faac`),
@@ -33,32 +34,29 @@ Myndr surfaces these in its third-party-licenses view.
 1. Bump `FFMPEG_VERSION` (and any lib version) in `build.sh`.
 2. Tag and push: `git tag n7.1.1-1 && git push origin n7.1.1-1`
    (tag = `n<ffmpeg-version>-<build-revision>`).
-3. The `build-ffmpeg-lgpl` workflow builds + verifies both arches and creates a
+3. The `build-ffmpeg-lgpl` workflow builds + verifies arm64 and creates a
    GitHub release with:
    - `ffmpeg-<ver>-macos-arm64.zip` (+ `.sha256`)
-   - `ffmpeg-<ver>-macos-x86_64.zip` (+ `.sha256`)
-4. Copy the two SHAs into myndr's `scripts/binaries.sha256` and set the tag
-   (see below). PRs build both arches but do **not** release.
+4. Copy the SHA into myndr's `scripts/binaries.sha256` and set the tag
+   (see below). PRs build but do **not** release.
 
 ## Consuming from myndr
 
 `scripts/binaries.sha256`:
 
 ```
-ffmpeg.macos.tag      n7.1.1-1
+ffmpeg.macos.tag      n7.1.1-2
 ffmpeg.darwin.arm64   <sha256 of ffmpeg-7.1.1-macos-arm64.zip>
-ffmpeg.darwin.amd64   <sha256 of ffmpeg-7.1.1-macos-x86_64.zip>
 ```
 
-`scripts/fetch-binaries.sh` (darwin branches) builds the URL from the tag:
+`scripts/fetch-binaries.sh` (darwin/arm64 branch) builds the URL from the tag:
 
 ```
-https://github.com/myndrai/myndr-ffmpeg-lgpl/releases/download/${TAG}/ffmpeg-${VER}-macos-${SLICE}.zip
+https://github.com/myndrai/myndr-ffmpeg-lgpl/releases/download/${TAG}/ffmpeg-${VER}-macos-arm64.zip
 ```
 
-where `SLICE` is `arm64` for darwin/arm64 and `x86_64` for darwin/amd64. The
-existing `zip:ffmpeg` extractor finds the `ffmpeg` binary inside the zip
-unchanged.
+The existing `zip:ffmpeg` extractor finds the `ffmpeg` binary inside the zip
+unchanged. The darwin/amd64 branch is removed in myndr (Intel unsupported).
 
 ## Not built here (yet)
 

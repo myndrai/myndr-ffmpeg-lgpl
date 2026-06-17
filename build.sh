@@ -41,7 +41,13 @@ export CFLAGS="-arch $ARCH -mmacosx-version-min=11.0 -O2 -fPIC"
 export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-arch $ARCH -mmacosx-version-min=11.0"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
-HOST_TRIPLE="$ARCH-apple-darwin"
+# GNU config.sub does not recognise Apple's "arm64" spelling; use the canonical
+# "aarch64". Autotools libs get --build==--host=<this> so they configure as a
+# native build (build==host, not cross) with a triple config.sub accepts.
+case "$ARCH" in
+  arm64)  GNU_TRIPLE="aarch64-apple-darwin" ;;
+  x86_64) GNU_TRIPLE="x86_64-apple-darwin" ;;
+esac
 NPROC="$(sysctl -n hw.ncpu)"
 
 fetch() { # <url> <outfile>
@@ -53,7 +59,7 @@ fetch() { # <url> <outfile>
 cd "$SRC"
 fetch "https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.gz" ogg.tgz
 tar xf ogg.tgz && cd "libogg-$OGG_VERSION"
-./configure --host="$HOST_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared
+./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared
 make -j"$NPROC" && make install
 cp COPYING "$DIST/licenses/libogg.LICENSE"
 
@@ -61,7 +67,7 @@ cp COPYING "$DIST/licenses/libogg.LICENSE"
 cd "$SRC"
 fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.gz" vorbis.tgz
 tar xf vorbis.tgz && cd "libvorbis-$VORBIS_VERSION"
-./configure --host="$HOST_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared \
+./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared \
   --with-ogg="$PREFIX"
 make -j"$NPROC" && make install
 cp COPYING "$DIST/licenses/libvorbis.LICENSE"
@@ -71,7 +77,7 @@ cd "$SRC"
 fetch "https://downloads.sourceforge.net/project/lame/lame/$LAME_VERSION/lame-$LAME_VERSION.tar.gz" lame.tgz
 tar xf lame.tgz && cd "lame-$LAME_VERSION"
 # lame's bundled config.guess predates Apple Silicon; --host pins the triple.
-./configure --host="$HOST_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared \
+./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared \
   --disable-frontend
 make -j"$NPROC" && make install
 cp COPYING "$DIST/licenses/libmp3lame.LICENSE"
@@ -80,7 +86,7 @@ cp COPYING "$DIST/licenses/libmp3lame.LICENSE"
 cd "$SRC"
 fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz" opus.tgz
 tar xf opus.tgz && cd "opus-$OPUS_VERSION"
-./configure --host="$HOST_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared
+./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared
 make -j"$NPROC" && make install
 cp COPYING "$DIST/licenses/libopus.LICENSE"
 
