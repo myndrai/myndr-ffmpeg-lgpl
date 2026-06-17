@@ -1,0 +1,76 @@
+name: build-ffmpeg-lgpl
+
+# Builds a static, LGPL-only ffmpeg for macOS arm64 + x86_64 and, on a version
+# tag, publishes them as immutable GitHub release assets that myndr pins by SHA.
+#
+#   workflow_dispatch / PR  -> build + verify both arches, upload CI artifacts
+#   push tag 'n*'           -> build + verify + create a release with assets
+#
+# The binaries are ad-hoc signed only; myndr's after-sign.js re-signs them with
+# the real Developer ID at packaging time, so this repo needs NO Apple secrets.
+
+on:
+  push:
+    tags: ['n*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed by the release job to upload assets
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-14, arch: arm64 }   # Apple Silicon (native)
+          - { runner: macos-13, arch: x86_64 }  # Intel (native)
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tooling
+        run: |
+          brew update
+          brew install nasm yasm cmake meson ninja pkg-config automake autoconf libtool
+
+      - name: Build static LGPL ffmpeg (${{ matrix.arch }})
+        run: ./build.sh ${{ matrix.arch }}
+
+      - name: Ad-hoc sign (myndr re-signs with its Developer ID at packaging)
+        run: codesign --force --sign - "dist-${{ matrix.arch }}/ffmpeg"
+
+      - name: Package + checksum
+        id: pkg
+        run: |
+          set -euo pipefail
+          ver="${FFMPEG_VERSION:-$(dist-${{ matrix.arch }}/ffmpeg -version | awk 'NR==1{print $3}')}"
+          asset="ffmpeg-${ver}-macos-${{ matrix.arch }}.zip"
+          ( cd "dist-${{ matrix.arch }}" && zip -r "../$asset" ffmpeg licenses BUILDINFO.txt )
+          shasum -a 256 "$asset" | tee "$asset.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pkg.outputs.asset }}
+          path: |
+            ${{ steps.pkg.outputs.asset }}
+            ${{ steps.pkg.outputs.asset }}.sha256
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, merge-multiple: true }
+      - name: Create release with binaries + checksums
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.zip
+            artifacts/*.zip.sha256
+          generate_release_notes: true
+          fail_on_unmatched_files: true

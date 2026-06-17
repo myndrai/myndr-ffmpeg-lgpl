@@ -1,0 +1,4 @@
+work-*/
+dist-*/
+*.zip
+*.zip.sha256
