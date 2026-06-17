@@ -60,16 +60,21 @@ cd "$SRC"
 fetch "https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.gz" ogg.tgz
 tar xf ogg.tgz && cd "libogg-$OGG_VERSION"
 ./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared
-make -j"$NPROC" && make install
+make -j"$NPROC"
+make install
 cp COPYING "$DIST/licenses/libogg.LICENSE"
 
 # -------------------------------------------------------------- libvorbis
 cd "$SRC"
 fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.gz" vorbis.tgz
 tar xf vorbis.tgz && cd "libvorbis-$VORBIS_VERSION"
+# Modern Apple ld rejects libvorbis 1.3.7's Darwin-only -force_cpusubtype_ALL
+# linker flag ("ld: unknown options: -force_cpusubtype_ALL"); strip it.
+sed -i.bak 's/-force_cpusubtype_ALL//g' configure
 ./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared \
   --with-ogg="$PREFIX"
-make -j"$NPROC" && make install
+make -j"$NPROC"
+make install
 cp COPYING "$DIST/licenses/libvorbis.LICENSE"
 
 # ------------------------------------------------------------- libmp3lame
@@ -79,7 +84,8 @@ tar xf lame.tgz && cd "lame-$LAME_VERSION"
 # lame's bundled config.guess predates Apple Silicon; --host pins the triple.
 ./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared \
   --disable-frontend
-make -j"$NPROC" && make install
+make -j"$NPROC"
+make install
 cp COPYING "$DIST/licenses/libmp3lame.LICENSE"
 
 # ----------------------------------------------------------------- libopus
@@ -87,7 +93,8 @@ cd "$SRC"
 fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz" opus.tgz
 tar xf opus.tgz && cd "opus-$OPUS_VERSION"
 ./configure --build="$GNU_TRIPLE" --host="$GNU_TRIPLE" --prefix="$PREFIX" --enable-static --disable-shared
-make -j"$NPROC" && make install
+make -j"$NPROC"
+make install
 cp COPYING "$DIST/licenses/libopus.LICENSE"
 
 # ------------------------------------------------------------------ libvpx
@@ -98,7 +105,8 @@ tar xf vpx.tgz && cd "libvpx-$VPX_VERSION"
   --enable-vp8 --enable-vp9 \
   --disable-examples --disable-tools --disable-docs --disable-unit-tests \
   --extra-cflags="-mmacosx-version-min=11.0"
-make -j"$NPROC" && make install
+make -j"$NPROC"
+make install
 cp LICENSE "$DIST/licenses/libvpx.LICENSE"
 
 # ------------------------------------------------------------------- dav1d
@@ -109,7 +117,8 @@ meson setup builddir --prefix="$PREFIX" --buildtype=release \
   --default-library=static -Denable_tools=false -Denable_tests=false \
   -Dc_args="-arch $ARCH -mmacosx-version-min=11.0" \
   -Dc_link_args="-arch $ARCH -mmacosx-version-min=11.0"
-ninja -C builddir && ninja -C builddir install
+ninja -C builddir
+ninja -C builddir install
 cp COPYING "$DIST/licenses/libdav1d.LICENSE"
 
 # ------------------------------------------------------------------ ffmpeg
