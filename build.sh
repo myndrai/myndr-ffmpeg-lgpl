@@ -131,7 +131,8 @@ tar xf ffmpeg.txz && cd "ffmpeg-$FFMPEG_VERSION"
   --disable-gpl --disable-nonfree --enable-version3 \
   --enable-static --disable-shared --enable-pic \
   --disable-doc --disable-debug --disable-ffplay \
-  --enable-videotoolbox --enable-audiotoolbox \
+  --disable-autodetect \
+  --enable-videotoolbox --enable-audiotoolbox --enable-zlib \
   --enable-libmp3lame --enable-libopus --enable-libvorbis \
   --enable-libvpx --enable-libdav1d \
   --pkg-config-flags=--static \
@@ -144,6 +145,22 @@ cp COPYING.LGPLv2.1 COPYING.LGPLv3 LICENSE.md "$DIST/licenses/" 2>/dev/null || t
 # ----------------------------------------------------- LGPL-compliance guard
 # This is the load-bearing check: prove the binary is genuinely LGPL and the
 # right arch before it can ever be released. Fails the build otherwise.
+# 1. arch (static inspection)
+if ! lipo -archs "$DIST/ffmpeg" | tr ' ' '\n' | grep -qx "$ARCH"; then
+  echo "FATAL: ffmpeg is not $ARCH (got: $(lipo -archs "$DIST/ffmpeg"))" >&2; exit 1
+fi
+# 2. only OS libraries may be dynamically linked. Any /opt/homebrew (or other
+#    non-system) dep means the binary runs in CI (Homebrew present) but dyld-fails
+#    on a clean Mac. zlib/libc++/libSystem live under /usr/lib; frameworks under
+#    /System/Library. This guard is what catches an auto-detected Homebrew link.
+NONSYS="$(otool -L "$DIST/ffmpeg" | tail -n +2 | awk '{print $1}' \
+  | grep -vE '^/usr/lib/|^/System/Library/' || true)"
+if [[ -n "$NONSYS" ]]; then
+  echo "FATAL: ffmpeg links non-system dylibs (breaks on clean machines):" >&2
+  echo "$NONSYS" >&2
+  exit 1
+fi
+# 3. genuinely LGPL + actually runs (deps are clean now, so it executes anywhere)
 "$DIST/ffmpeg" -version | head -n 3
 BUILDCONF="$("$DIST/ffmpeg" -buildconf)"
 if grep -qi -- '--enable-gpl' <<<"$BUILDCONF"; then
@@ -152,9 +169,13 @@ fi
 if grep -qi -- '--enable-nonfree' <<<"$BUILDCONF"; then
   echo "FATAL: ffmpeg built with --enable-nonfree (non-redistributable)" >&2; exit 1
 fi
-if ! lipo -archs "$DIST/ffmpeg" | tr ' ' '\n' | grep -qx "$ARCH"; then
-  echo "FATAL: ffmpeg is not $ARCH (got: $(lipo -archs "$DIST/ffmpeg"))" >&2; exit 1
-fi
+# 4. VideoToolbox H.264/H.265 encoders must be present (the whole point of the
+#    LGPL build — they replace x264/x265).
+for enc in h264_videotoolbox hevc_videotoolbox; do
+  if ! "$DIST/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q "$enc"; then
+    echo "FATAL: missing encoder $enc" >&2; exit 1
+  fi
+done
 
 {
   echo "ffmpeg $FFMPEG_VERSION — macOS $ARCH — static, LGPL (--disable-gpl --disable-nonfree)"
